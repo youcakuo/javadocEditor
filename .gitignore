@@ -1,4 +1,4 @@
-JavadocEditor.spec
+*.spec
 __pycache__/
 build/
 dist/
