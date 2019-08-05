@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[17]:
+# In[1]:
 
 
 # coding: utf-8
@@ -11,12 +11,12 @@ import os
 from git import Repo
 from docx.api import Document
 
-VERSION = '1.3.1'
+VERSION = '1.3.2'
 spec_data = []
 
 def get_spec_file(txnId):
     #print('[debug]get_spec_file')
-    spec_path = "\\\\10.204.1.80\\tfb\\T-NBTS 專案_第二階段\\工作區\\個人工作區\\Shen\\javadoc_spec"
+    spec_path = "\\\\10.204.1.80\\tfb\\T-NBTS 專案_第二階段\\工作區\\個人工作區\\Shen\\javadoc\\javadoc_spec"
     all_spec_path_80='\\\\10.204.1.80\\tfb\\T-NBTS 專案_第二階段\\!IISI_FILE\\81第二階段-需求規格書'
     all_spec_path_89='\\\\172.16.240.89\\E_Disk\\!IISI_FILE\\81第二階段-需求規格書'
     result = ''
