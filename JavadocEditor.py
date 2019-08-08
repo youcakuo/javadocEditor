@@ -1,19 +1,20 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[6]:
 
 
 # coding: utf-8
 
-import re
-import os
-from git import Repo
-from docx.api import Document
 import win32com.client
+from docx.api import Document
+import logging
+import os
+import re
+import sys
+from git import Repo
 
 VERSION = '1.3.2'
-
 
 def get_spec_file(txnId):
     #print('[debug]get_spec_file')
@@ -53,6 +54,7 @@ def get_spec_file(txnId):
                     if not '歷史' in root and not '~$' in file:
                         #result = root + '\\' + file
                         result = os.path.join(root, file)
+    logging.debug('[get_spec_file]' + result)
     return result
 
 def convert_doc_to_docx(file):
@@ -62,13 +64,15 @@ def convert_doc_to_docx(file):
         doc.SaveAs(docx_file, 12)
         doc.Close()
         word.Quit()
+        logging.debug('[convert_doc_to_docx]' + docx_file)
         return docx_file
     else:
+        logging.debug('[convert_doc_to_docx] NA')
         return ''
         
 
 def specParser(txnId):
-    print('search spec for ' + txnId)
+    logging.info('search spec for ' + txnId)
     spec_data1 = []
     spec_data2 = []
     spec_data3 = ''
@@ -76,18 +80,18 @@ def specParser(txnId):
     file = ''
     try:
         file = get_spec_file(txnId)
-        print('[specParser] get_spec_file: ' + file)
+        logging.debug('[specParser] get_spec_file: ' + file)
     except:
-        print('error when try to find sepcification')
+        logging.info('error when try to find sepcification')
     if not file:
-        print('no valid spec found')
+        logging.warning('no valid spec found')
     else:
         converted_docx_file = convert_doc_to_docx(file)
-        print('sepcification:' + file)
+        logging.info('sepcification:' + file)
         if converted_docx_file:
-            print('convert doc extension to docx')
+            logging.info('convert doc extension to docx')
         document = Document(converted_docx_file) if converted_docx_file else Document(file)
-        print('spec open done')
+        logging.info('spec open done')
         for table in document.tables:
             spec_data1 = []
             spec_data2 = []
@@ -97,13 +101,13 @@ def specParser(txnId):
                 if i == 0:
                     keys = tuple(text)
                     if keys == ('序號', '序號欄位名稱', 'I/O', '資料型態', '畫面元件', '格式化', '預設值', '必輸', '唯讀', '隱藏', '屬性及檢核'):
-                        #print('欄位屬性')
+                        logging.debug('[specParser]欄位屬性')
                         continue
                     elif keys == ('序號', '欄位名稱', '處理方式'):
-                        #print('欄位檢核說明')
+                        logging.debug('[specParser]欄位檢核說明')
                         continue
                     elif keys[0] == '交易初始化處理':
-                        #print('交易初始化處理')
+                        logging.debug('[specParser]交易初始化處理')
                         tmp = keys[1].replace('N/A','').rstrip()
                         if tmp:
                             spec_data3 = tmp
@@ -147,7 +151,7 @@ def getSpec1Content(spec):
         for row in rowdata:
             if len(row['屬性及檢核']) > 20:
                 result = result + preTab + row['序號欄位名稱'].replace('\n','') + ': ' + row['屬性及檢核'] + '\n'
-    #print('spec1:' + result)
+    logging.debug('[getSpec1Content]' + result)
     return result
                 
 def getSpec2Content(spec):
@@ -170,6 +174,7 @@ def getSpec2Content(spec):
         for row in rowdata:
             if len(row['處理方式']) > 20:
                 result = result + preTab + row['欄位名稱'].replace('\n','') + ': ' + row['處理方式'] + '\n'
+    logging.debug('[getSpecwContent]' + result)
     return result
                 
 def getSpec3Content(spec):
@@ -179,6 +184,7 @@ def getSpec3Content(spec):
     if spec[len(spec) -1]:
         result =  '     * ' + spec[len(spec)-1]
         result = result.replace('\n','\n     * ') + '\n'
+    logging.debug('[getSpec3Content]' + result)
     return result
     
 def find_modified_source_files():
@@ -199,12 +205,12 @@ def find_modified_source_files():
     return java_files
     
 def javadoc_template_for_sourcefile(javaFile):
-    print('process file: ' + javaFile)
+    logging.info('process file: ' + javaFile)
     try:
         spec_data = specParser(fileNameToTxnId(javaFile))
     except:
         spec_data = []
-        print('Error when specParser')
+        logging.warning('Error when specParser')
     newlines = []   
     scriptTag = ''
     funcName = ''
@@ -217,17 +223,12 @@ def javadoc_template_for_sourcefile(javaFile):
                     if '*' in str(f_content[i+j]):
                         continue
                     line1 = str(f_content[i+j])
-                    #line2 = str(f_content[i+j+1])
                     if 'private' in line1 or 'public' in line1 or 'protected' in line1:
                         scriptTag = 'CommentScriptlet'
-                        #funcString = line1
                     else:
                         for n in range(5):                            
-                            #funcString = line2
                             line1 = str(f_content[i+j+n])
                             tokens = re.split( r'[@(]', line1 )
-
-                            #line1 = line2
                             if tokens[1] == 'CommentScriptlet' or tokens[1] == 'RelationshipScriptlet':
                                 scriptTag = tokens[1]
                             line1 = str(f_content[i+j+n+1])
@@ -330,31 +331,45 @@ def javadoc_template_for_sourcefile(javaFile):
                         newlines.append('     * 交易確認執行完畢後，判斷是否應結束\n')
                         line = '     * 依據transactionState判斷交易是否結束\n'
                     funcName = ''
-                    #scriptTag = ''
                 newlines.append(line)
 
     with open(javaFile, 'w', encoding='utf-8') as f:
         for line in newlines:
             f.write(line)
-        print('finish file: ' + javaFile + '\n')
+        logging.info('finish file: ' + javaFile + '\n')
 
-    
+def para_Handler(args):
+    for arg in args:
+        if arg.startswith('-'):
+            arg1 = arg[1:]
+            if arg1 == 'D':
+                logging.getLogger().setLevel(logging.DEBUG)
+        else:
+            logging.warning('Error parameter format')
+        
 def main():
-    print('version: ' + VERSION)
-    print('----------------------------------------------------------------------------')
+    logging.getLogger().setLevel(logging.INFO)
+    para_Handler(sys.argv[1:])
+    logging.info('version: ' + VERSION)
+    logging.info('-----------------------------------------------------------------------')
 
     java_files = find_modified_source_files()
-    print('modified files:')
+    logging.info('modified files:')
     for mfiles in java_files:
-        print('  ' + mfiles)
-    print('\n----------------------------------------------------------------------------')
+        logging.info('  ' + mfiles)
+    logging.info('\n-----------------------------------------------------------------------')
     for javaFile in java_files:
         javadoc_template_for_sourcefile(javaFile)
+        
+        
+    logging.warning('warning')
+    logging.info('info')
+    logging.debug('debug')
                 
 if __name__ == '__main__':
     try:
         main()
     finally:
-        print('press Enter to continue...')
+        logging.info('press Enter to continue...')
         input()
 
