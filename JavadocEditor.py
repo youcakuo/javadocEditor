@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[6]:
+# In[4]:
 
 
 # coding: utf-8
@@ -13,64 +13,54 @@ import os
 import re
 import sys
 from git import Repo
+import csv
+import ctypes
 
-VERSION = '1.3.2'
+workingspace = ''
+
+def get_spec_from_path(path, txnId):
+    logging.debug('search from ' + path + ' for ' + txnId)
+    result1 = ''
+    result2 = ''
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            if file.endswith('.docx') and txnId in file:
+                if not '歷史' in root and not '~$' in file:
+                    result1 = os.path.join(root, file)
+            if file.endswith('.doc') and txnId in file:
+                if not '歷史' in root and not '~$' in file:
+                    result2 = os.path.join(root, file)
+    return result1 or result2
 
 def get_spec_file(txnId):
-    #print('[debug]get_spec_file')
+    local_path = '.'
     spec_path = "\\\\10.204.1.80\\tfb\\T-NBTS 專案_第二階段\\工作區\\個人工作區\\Shen\\javadoc\\javadoc_spec"
     all_spec_path_80='\\\\10.204.1.80\\tfb\\T-NBTS 專案_第二階段\\!IISI_FILE\\81第二階段-需求規格書'
     all_spec_path_89='\\\\172.16.240.89\\E_Disk\\!IISI_FILE\\81第二階段-需求規格書'
     result = ''
-    for root, dirs, files in os.walk('.'):
-        for file in files:
-            if file.endswith('.docx') and txnId in file:
-                if not '歷史' in root and not '~$' in file:
-                    #result = root + '\\' + file
-                    result = os.path.join(root, file)
-    if not result:
-        for file in os.listdir(spec_path):
-            if file.endswith(".docx") and txnId in file:
-                #result = spec_path + '\\' + file
-                result = os.path.join(spec_path, file)
-    if not result:
-        for root, dirs, files in os.walk(all_spec_path_89):
-            for file in files:
-                if file.endswith('.docx') and txnId in file:
-                    if not '歷史' in root and not '~$' in file:
-                        #result = root + '\\' + file
-                        result = os.path.join(root, file)
-    if not result:
-        for root, dirs, files in os.walk(all_spec_path_80):
-            for file in files:
-                if file.endswith('.docx') and txnId in file:
-                    if not '歷史' in root and not '~$' in file:
-                        #result = root + '\\' + file
-                        result = os.path.join(root, file)
-    if not result:
-        for root, dirs, files in os.walk(all_spec_path_89):
-            for file in files:
-                if file.endswith('.doc') and txnId in file:
-                    if not '歷史' in root and not '~$' in file:
-                        #result = root + '\\' + file
-                        result = os.path.join(root, file)
-    logging.debug('[get_spec_file]' + result)
+    search_path = [local_path, spec_path, all_spec_path_89, all_spec_path_80]
+    logging.debug(search_path)
+    for path in search_path:
+        result = get_spec_from_path(path, txnId)
+        if result:
+            break
+    logging.debug(result)
     return result
 
 def convert_doc_to_docx(file):
     if file.endswith('.doc'):
-        doc = word.Documents.Open(file_path)
-        docx_file = '{0}{1}'.format(file_path, 'x')
+        word = win32com.client.Dispatch("Word.application")
+        doc = word.Documents.Open(file)
+        docx_file = '{0}{1}'.format(file, 'x')
         doc.SaveAs(docx_file, 12)
         doc.Close()
         word.Quit()
-        logging.debug('[convert_doc_to_docx]' + docx_file)
+        logging.debug(docx_file)
         return docx_file
     else:
-        logging.debug('[convert_doc_to_docx] NA')
+        logging.debug('NA')
         return ''
         
-
 def specParser(txnId):
     logging.info('search spec for ' + txnId)
     spec_data1 = []
@@ -80,9 +70,9 @@ def specParser(txnId):
     file = ''
     try:
         file = get_spec_file(txnId)
-        logging.debug('[specParser] get_spec_file: ' + file)
+        logging.debug('get_spec_file: ' + file)
     except:
-        logging.info('error when try to find sepcification')
+        logging.exception("Exception occurred when try to find sepcification")
     if not file:
         logging.warning('no valid spec found')
     else:
@@ -101,13 +91,13 @@ def specParser(txnId):
                 if i == 0:
                     keys = tuple(text)
                     if keys == ('序號', '序號欄位名稱', 'I/O', '資料型態', '畫面元件', '格式化', '預設值', '必輸', '唯讀', '隱藏', '屬性及檢核'):
-                        logging.debug('[specParser]欄位屬性')
+                        logging.debug('欄位屬性')
                         continue
                     elif keys == ('序號', '欄位名稱', '處理方式'):
                         logging.debug('[specParser]欄位檢核說明')
                         continue
                     elif keys[0] == '交易初始化處理':
-                        logging.debug('[specParser]交易初始化處理')
+                        logging.debug('交易初始化處理')
                         tmp = keys[1].replace('N/A','').rstrip()
                         if tmp:
                             spec_data3 = tmp
@@ -151,7 +141,7 @@ def getSpec1Content(spec):
         for row in rowdata:
             if len(row['屬性及檢核']) > 20:
                 result = result + preTab + row['序號欄位名稱'].replace('\n','') + ': ' + row['屬性及檢核'] + '\n'
-    logging.debug('[getSpec1Content]' + result)
+    logging.debug(result)
     return result
                 
 def getSpec2Content(spec):
@@ -174,7 +164,7 @@ def getSpec2Content(spec):
         for row in rowdata:
             if len(row['處理方式']) > 20:
                 result = result + preTab + row['欄位名稱'].replace('\n','') + ': ' + row['處理方式'] + '\n'
-    logging.debug('[getSpecwContent]' + result)
+    logging.debug(result)
     return result
                 
 def getSpec3Content(spec):
@@ -184,8 +174,61 @@ def getSpec3Content(spec):
     if spec[len(spec) -1]:
         result =  '     * ' + spec[len(spec)-1]
         result = result.replace('\n','\n     * ') + '\n'
-    logging.debug('[getSpec3Content]' + result)
+    logging.debug(result)
     return result
+    
+def read_user_defined_file(csv_path = ''):
+    result = False
+    if not csv_path:
+        global workingspace
+        csv_path = os.path.join(workingspace,'user.csv')
+    logging.debug('try to load file: ' + csv_path)
+    try:
+        with open(csv_path, newline='') as csvfile:
+            reader = csv.DictReader(csvfile)
+            result = True
+    except Exception as e:
+        logging.exception('error when try to open user.csv')
+    return result
+    
+def get_user_defined_dict(func_name):
+    global workingspace
+    lines = []
+    csv_path = os.path.join(workingspace,'user.csv')
+    with open(csv_path, newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            op = row['relation']
+            key = row['key']
+            l3 = row['line3']
+            l4 = row['line4']
+            match = False
+            if op == 'eq':
+                if func_name == key:
+                    match = True
+            elif op == 'bg':
+                if func_name.startswith(key):
+                    match = True
+            elif op == 'ed':
+                if func_name.endswith(key):
+                    match = True
+            elif op == 'in':
+                if key in func_name:
+                    match = True
+            else:
+                logging.error('unknown relation ' + op + ' when matching ' + key)
+                continue
+            if match:
+                logging.debug('match ' + func_name + ' with ' + key + ' for ' + op)
+                if l3:
+                    lines.append(l3)
+                    if l4:
+                        lines.append(l4)
+            else:
+                logging.debug('not match ' + func_name + ' with ' + key + ' for ' + op)
+            if lines:
+                break
+    return lines
     
 def find_modified_source_files():
     path = '.'
@@ -208,17 +251,26 @@ def javadoc_template_for_sourcefile(javaFile):
     logging.info('process file: ' + javaFile)
     try:
         spec_data = specParser(fileNameToTxnId(javaFile))
-    except:
+    except Exception as e:
         spec_data = []
-        logging.warning('Error when specParser')
+        logging.exception('Error when specParser')
+        logging.debug(e)
+    is_csv_found = read_user_defined_file()
+    if not is_csv_found:
+        logging.info('No user.csv found')
+    else:
+        logging.info('customization file user.csv found')
     newlines = []   
     scriptTag = ''
     funcName = ''
+    parseStage = 0
     with open(javaFile, 'r', encoding='utf-8') as f:
         f_content = f.readlines()
         for i, line in enumerate(f_content):
             if '[method_name]' in str(line):
                 scriptTag = ''
+                funcName = ''
+                parseStage = 1
                 for j in range(20):
                     if '*' in str(f_content[i+j]):
                         continue
@@ -231,6 +283,8 @@ def javadoc_template_for_sourcefile(javaFile):
                             tokens = re.split( r'[@(]', line1 )
                             if tokens[1] == 'CommentScriptlet' or tokens[1] == 'RelationshipScriptlet':
                                 scriptTag = tokens[1]
+                                func_tokens = re.split(r'["]', tokens[len(tokens) -1])
+                                funcName = func_tokens[len(func_tokens) - 2]
                             line1 = str(f_content[i+j+n+1])
                             if not '@' in line1:
                                 if scriptTag == '':
@@ -239,11 +293,15 @@ def javadoc_template_for_sourcefile(javaFile):
                     tokens = re.split(r'[(]', line1)
                     line1 = tokens[0]
                     tokens = re.split(r'[ ]', line1)
-                    funcName = tokens[len(tokens) -1]
+                    if not funcName:
+                        funcName = tokens[len(tokens) -1]
                     break
                 line = line.replace('[method_name]', '#' + scriptTag + ': ' + funcName)
-                newlines.append(line)
+                #newlines.append(line)
             elif '[override_name]' in str(line):
+                scriptTag = ''
+                funcName = ''
+                parseStage = 1
                 scriptTag = 'CommentScriptlet'
                 for j in range(20):
                     if '*' in str(f_content[i+j]):
@@ -259,8 +317,8 @@ def javadoc_template_for_sourcefile(javaFile):
                 line = line.replace('[override_name]', '#' + 'Method: ' + funcName)
                 newlines.append(line)
                 line = "     * #UsedByScriptlet: CrossValidation_Rule1\n"
-                newlines.append(line)
-            else:
+                #newlines.append(line)
+            elif parseStage == 2:
                 if '@param f\n' in line:
                     line = line.replace('@param f', '@param f 流程Facade')
                 elif '@param n\n' in line:
@@ -280,9 +338,34 @@ def javadoc_template_for_sourcefile(javaFile):
                         line = line.replace('@return', '@return true為交易結束、false為尚未結束')
                     elif funcName == 'defaultBeforeInputConditions':
                         line = line.replace('@return', '@return true為可開放輸入、false為不可開放輸入')
-                elif '[method_desc]' in line or '[override_desc]' in line:
+            elif parseStage == 1:
+                if '[method_desc]' in line or '[override_desc]' in line:
+                    parseStage = 2
+                    if is_csv_found:
+                        try:
+                            userDefined = get_user_defined_dict(funcName)
+                        except Exception as e:
+                            userDefined = None
+                            is_csv_found = False
+                            logging.exception('Error when read user.csv')
+                    else:
+                        userDefined = None
                     if scriptTag == 'RelationshipScriptlet':
                         newlines.append('     * 關聯條件運算式\n')
+                    elif userDefined:
+                        logging.debug('match from user custimization')
+                        if len(userDefined) > 0:
+                            newlines.append('     * ' + userDefined[0] + '\n')
+                        if len(userDefined) > 1:
+                            l4 = userDefined[1]
+                            if '[PI]' == l4 and getSpec3Content(spec_data):
+                                line = getSpec3Content(spec_data)
+                            elif '[FC]' == l4 and getSpec1Content(spec_data):
+                                line = getSpec1Content(spec_data)
+                            elif '[CV]' == l4 and getSpec2Content(spec_data):
+                                line = getSpec2Content(spec_data)
+                            elif l4:
+                                line = '     * ' + l4 + '\n'
                     elif funcName == 'doCrossValidationWhenAction':
                         newlines.append('     * 按鈕點擊的檢核與處理\n')
                     elif funcName == 'ActionControl':
@@ -330,8 +413,10 @@ def javadoc_template_for_sourcefile(javaFile):
                     elif 'InputController' in funcName:
                         newlines.append('     * 交易確認執行完畢後，判斷是否應結束\n')
                         line = '     * 依據transactionState判斷交易是否結束\n'
-                    funcName = ''
-                newlines.append(line)
+                    #funcName = ''
+            elif '*/' in line:
+                parseStage = 0
+            newlines.append(line)
 
     with open(javaFile, 'w', encoding='utf-8') as f:
         for line in newlines:
@@ -339,37 +424,42 @@ def javadoc_template_for_sourcefile(javaFile):
         logging.info('finish file: ' + javaFile + '\n')
 
 def para_Handler(args):
+    setDebug = False
     for arg in args:
         if arg.startswith('-'):
             arg1 = arg[1:]
             if arg1 == 'D':
-                logging.getLogger().setLevel(logging.DEBUG)
+                #logging.getLogger().setLevel(logging.DEBUG)
+                logging.basicConfig(level=logging.DEBUG, format='[%(lineno)d]%(levelname)s: [%(funcName)s]%(message)s')
+                setDebug = True
         else:
-            logging.warning('Error parameter format')
+            print('Error parameter format')
+    if not setDebug:
+        logging.basicConfig(level=logging.INFO, format='%(message)s')
+    logging.debug(args)
         
-def main():
-    logging.getLogger().setLevel(logging.INFO)
-    para_Handler(sys.argv[1:])
-    logging.info('version: ' + VERSION)
-    logging.info('-----------------------------------------------------------------------')
+def update_message():
+    select = ctypes.windll.user32.MessageBoxW(0, "現在可自定義函式的對應keyword", "Update", 1)
 
+def main():
+    #logging.basicConfig(level=logging.DEBUG, format='[%(lineno)d]%(levelname)s: [%(funcName)s]%(message)s')
+    #logging.getLogger().setLevel(logging.DEBUG)
+    para_Handler(sys.argv[1:])
+    update_message()
+    global workingspace
+    workingspace = os.getcwd()
     java_files = find_modified_source_files()
-    logging.info('modified files:')
+    print('modified files:')
     for mfiles in java_files:
-        logging.info('  ' + mfiles)
-    logging.info('\n-----------------------------------------------------------------------')
+        print('  ' + mfiles)
+    print('----------------------------------------------------------------------------')
     for javaFile in java_files:
         javadoc_template_for_sourcefile(javaFile)
-        
-        
-    logging.warning('warning')
-    logging.info('info')
-    logging.debug('debug')
                 
 if __name__ == '__main__':
     try:
         main()
     finally:
-        logging.info('press Enter to continue...')
+        print('press Enter to continue...')
         input()
 
