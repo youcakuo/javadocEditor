@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[4]:
+# In[12]:
 
 
 # coding: utf-8
@@ -15,6 +15,9 @@ import sys
 from git import Repo
 import csv
 import ctypes
+import socket
+import sqlite3
+import time
 
 workingspace = ''
 
@@ -438,8 +441,98 @@ def para_Handler(args):
         logging.basicConfig(level=logging.INFO, format='%(message)s')
     logging.debug(args)
         
+def message_to_show(count):
+    show_message = ''
+    r_count = -1
+    try:
+        conn = sqlite3.connect('\\\\10.204.1.80\\tfb\\T-NBTS 專案_第二階段\\工作區\\個人工作區\\Shen\\javadoc\\javadoc2.db')
+        c = conn.cursor()
+        cursor = c.execute("SELECT MESSAGE from UPDATEMESSAGE WHERE COUNT >= {}".format(count))
+        for i, row in enumerate(cursor):
+            show_message += str(i+1) + '. ' + row[0] + '\n'
+            r_count = i
+    except Exception as e:
+        logging.info(e)
+    finally:
+        conn.close() 
+    if not show_message:
+        show_message = 'no update information'
+    if r_count >= 0:
+        return [count+r_count+1, show_message]
+    else:
+        return None
+    
 def update_message():
-    select = ctypes.windll.user32.MessageBoxW(0, "現在可自定義函式的對應keyword", "Update", 1)
+    ipaddr = 'unknown IP address'
+    current_ver = 0
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ipaddr = s.getsockname()[0]
+    except OSError as e:
+        logging.info(e)
+    finally:
+        s.close()
+    userid = os.environ['COMPUTERNAME']
+    found_record = False
+    logging.info('userid: ' + userid + ' at ' + ipaddr)
+    try:
+        conn = sqlite3.connect('\\\\10.204.1.80\\tfb\\T-NBTS 專案_第二階段\\工作區\\個人工作區\\Shen\\javadoc\\javadoc2.db')
+        c = conn.cursor()
+        c.execute('CREATE TABLE RECORD(IP CHAR(20) PRIMARY KEY NOT NULL,ID CHAR(50), VERSION int)')      
+        conn.commit()
+        logging.debug('create table')
+    except Exception as e:
+        logging.info(e)
+    finally:
+        conn.close()
+    time.sleep(0.5)  
+    try:
+        conn = sqlite3.connect('\\\\10.204.1.80\\tfb\\T-NBTS 專案_第二階段\\工作區\\個人工作區\\Shen\\javadoc\\javadoc2.db')
+        c = conn.cursor()
+        cursor = c.execute("SELECT ID, VERSION from RECORD WHERE ID = '{}'".format(userid))
+        data=cursor.fetchall()
+        print(data)
+        print(type(data))
+        if len(data) > 0:
+            found_record = True
+            current_ver = data[0][1]
+            logging.debug('record found')
+        else:
+            logging.debug('no record found')
+    except Exception as e:
+        logging.info(e)
+    finally:
+        conn.close()    
+    time.sleep(0.5)    
+    mts = message_to_show(current_ver)
+    if mts:
+        select = ctypes.windll.user32.MessageBoxW(0, mts[1], "更新資訊", 1)
+        if select == 1:
+            if not found_record:
+                #print("INSERT INTO RECORD (IP,ID, VERSION) VALUES ('{}', '{}', '{}')".format(ipaddr, userid, mts[0]))
+                try:
+                    conn = sqlite3.connect('\\\\10.204.1.80\\tfb\\T-NBTS 專案_第二階段\\工作區\\個人工作區\\Shen\\javadoc\\javadoc2.db')
+                    c = conn.cursor()
+                    c.execute("INSERT INTO RECORD (IP,ID,VERSION) VALUES ('{}', '{}', '{}')".format(ipaddr, userid, mts[0]));
+                    conn.commit()
+                    logging.info('insert to db successful')
+                except Exception as e:
+                    logging.info(e)
+                finally:
+                    conn.close()
+            else:
+                #print("UPDATE RECORD SET VERSION = {} WHERE ID = '{}'".format(mts[0], userid))
+                try:
+                    conn = sqlite3.connect('\\\\10.204.1.80\\tfb\\T-NBTS 專案_第二階段\\工作區\\個人工作區\\Shen\\javadoc\\javadoc2.db')
+                    c = conn.cursor()
+                    c.execute("UPDATE RECORD SET VERSION = {} WHERE ID = '{}'".format(mts[0], userid));
+                    conn.commit()
+                    logging.info('update version successful')
+                except Exception as e:
+                    logging.info(e)
+                finally:
+                    conn.close()
 
 def main():
     #logging.basicConfig(level=logging.DEBUG, format='[%(lineno)d]%(levelname)s: [%(funcName)s]%(message)s')
