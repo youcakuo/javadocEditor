@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[12]:
+# In[1]:
 
 
 # coding: utf-8
@@ -236,9 +236,15 @@ def get_user_defined_dict(func_name):
 def find_modified_source_files():
     path = '.'
     java_files = [f for f in os.listdir(path) if f.endswith('.java')]
-
+    repo_path = ''
+    txn_dirs = ["c://iisi/infinity-developer/repos/infinity-application-tfbnbts-transactions","d://iisi/infinity-developer/repos/infinity-application-tfbnbts-transactions","c://iisi/develop/infinity-developer/repos/infinity-application-tfbnbts-transactions","d://iisi/develop/infinity-developer/repos/infinity-application-tfbnbts-transactions"]
+    for txn_dir in txn_dirs:
+        if os.path.isdir(txn_dir):
+            repo_path = txn_dir
+            break
     if not java_files:
-        os.chdir("c://iisi/infinity-developer/repos/infinity-application-tfbnbts-transactions")
+        #os.chdir("c://iisi/infinity-developer/repos/infinity-application-tfbnbts-transactions")
+        os.chdir(repo_path)
         repo = Repo('.')
         result = repo.git.status()
         tokens = re.split(r'[\n]', result)
@@ -449,7 +455,8 @@ def message_to_show(count):
         c = conn.cursor()
         cursor = c.execute("SELECT MESSAGE from UPDATEMESSAGE WHERE COUNT >= {}".format(count))
         for i, row in enumerate(cursor):
-            show_message += str(i+1) + '. ' + row[0] + '\n'
+            if row[0]:
+                show_message += '- ' + row[0] + '\n'
             r_count = i
     except Exception as e:
         logging.info(e)
